@@ -1,18 +1,14 @@
 mod lexer;
 
 use anyhow::Result;
-use lexer::{Lexer, Token};
+use lexer::Lexer;
 use std::fs::File;
 
 fn main() -> Result<()> {
-    let file = File::open("tests/plus.kal")?;
+    let file = File::open("tests/test_1.kal")?;
     let mut lexer = Lexer::new(file);
-    loop {
-        let token = lexer.next_token()?;
-        println!("{:?}", token);
-        if token == Token::Eof {
-            break;
-        }
-    }
+    let tokens = lexer.tokenize()?;
+
+    println!("{:?}", tokens);
     Ok(())
 }

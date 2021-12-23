@@ -25,7 +25,20 @@ impl<R: Read> Lexer<R> {
         }
     }
 
-    pub fn next_token(&mut self) -> Result<Token> {
+    pub fn tokenize(&mut self) -> Result<Vec<Token>> {
+        let mut tokens: Vec<Token> = vec![];
+        loop {
+            let token = self.next_token()?;
+            if token == Token::Eof {
+                tokens.push(token);
+                break;
+            };
+            tokens.push(token);
+        }
+        Ok(tokens)
+    }
+
+    fn next_token(&mut self) -> Result<Token> {
         if let Some(&Ok(byte)) = self.bytes.peek() {
             return match byte {
                 b' ' | b'\n' | b'\r' | b'\t' => {
@@ -87,5 +100,28 @@ impl<R: Read> Lexer<R> {
             Some(Err(e)) => Err(anyhow!(e)),
             None => Ok(None),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::fs::File;
+
+    #[test]
+    fn test_num_plus_num() {
+        let f = File::open("tests/test_1.kal").unwrap();
+        let mut lexer = Lexer::new(f);
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Number(9999.0),
+                Token::Plus,
+                Token::Number(1.0),
+                Token::Eof
+            ]
+        );
     }
 }
