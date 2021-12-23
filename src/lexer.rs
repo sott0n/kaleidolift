@@ -6,11 +6,26 @@ use std::iter::Peekable;
 pub enum Token {
     // Primary
     Number(f64),
+    Identifier(String),
+
+    // Commands
+    Def,
+    Extern,
 
     // Operations
     Plus,
+    Minus,
+    Star,
+    Div,
+    LessThan,
+    MoreThan,
 
     // Other
+    Semicolon,
+    Comma,
+    OpenParen,
+    CloseParen,
+
     Eof,
 }
 
@@ -45,11 +60,22 @@ impl<R: Read> Lexer<R> {
                     self.bytes.next();
                     self.next_token()
                 }
+                b'a'..=b'z' | b'A'..=b'Z' => self.identifier(),
                 b'0'..=b'9' | b'.' => self.number(),
+                b'#' => self.comment(),
                 _ => {
                     self.bytes.next();
                     let token = match byte {
                         b'+' => Token::Plus,
+                        b'-' => Token::Minus,
+                        b'*' => Token::Star,
+                        b'/' => Token::Div,
+                        b'<' => Token::LessThan,
+                        b'>' => Token::MoreThan,
+                        b';' => Token::Semicolon,
+                        b',' => Token::Comma,
+                        b'(' => Token::OpenParen,
+                        b')' => Token::CloseParen,
                         _ => return Err(anyhow!(format!("Unknown charactor: {}", byte))),
                     };
                     Ok(token)
@@ -101,6 +127,41 @@ impl<R: Read> Lexer<R> {
             None => Ok(None),
         }
     }
+
+    fn identifier(&mut self) -> Result<Token> {
+        let mut ident = String::new();
+        loop {
+            if let Some(c) = self.peek_char()? {
+                if c.is_ascii_alphanumeric() {
+                    self.bytes.next();
+                    ident.push(c);
+                    continue;
+                }
+            }
+            break;
+        }
+
+        let token = match ident.as_str() {
+            "def" => Token::Def,
+            "extern" => Token::Extern,
+            _ => Token::Identifier(ident),
+        };
+        Ok(token)
+    }
+
+    fn comment(&mut self) -> Result<Token> {
+        loop {
+            if let Some(c) = self.peek_char()? {
+                self.bytes.next();
+                if c == '\n' {
+                    break;
+                }
+            } else {
+                return Ok(Token::Eof);
+            }
+        }
+        self.next_token()
+    }
 }
 
 #[cfg(test)]
@@ -120,6 +181,59 @@ mod test {
                 Token::Number(9999.0),
                 Token::Plus,
                 Token::Number(1.0),
+                Token::Plus,
+                Token::Number(22.0),
+                Token::Minus,
+                Token::Number(1.0),
+                Token::Star,
+                Token::Number(3.0),
+                Token::Div,
+                Token::Number(2.0),
+                Token::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn test_less_more_than() {
+        let f = File::open("tests/test_2.kal").unwrap();
+        let mut lexer = Lexer::new(f);
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Number(30.0),
+                Token::LessThan,
+                Token::Number(40.0),
+                Token::Semicolon,
+                Token::Number(20.0),
+                Token::MoreThan,
+                Token::Number(10.0),
+                Token::Semicolon,
+                Token::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn test_identifier() {
+        let f = File::open("tests/test_3.kal").unwrap();
+        let mut lexer = Lexer::new(f);
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Extern,
+                Token::Identifier("hello".to_string()),
+                Token::Semicolon,
+                Token::Def,
+                Token::Identifier("world".to_string()),
+                Token::OpenParen,
+                Token::Number(10.0),
+                Token::CloseParen,
+                Token::Semicolon,
                 Token::Eof
             ]
         );
