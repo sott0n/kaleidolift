@@ -1,2 +1,7 @@
-extern hello;
-def world(10);
+extern hello();
+
+def world()
+  10
+
+hello()
+world()

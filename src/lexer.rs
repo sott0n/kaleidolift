@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use std::io::{Bytes, Read};
 use std::iter::Peekable;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     // Primary
     Number(f64),
@@ -170,7 +170,7 @@ mod test {
     use std::fs::File;
 
     #[test]
-    fn test_num_plus_num() {
+    fn test_arithmetic() {
         let f = File::open("tests/test_1.kal").unwrap();
         let mut lexer = Lexer::new(f);
         let tokens = lexer.tokenize().unwrap();
@@ -178,17 +178,26 @@ mod test {
         assert_eq!(
             tokens,
             vec![
+                Token::Def,
+                Token::Identifier("compute".to_string()),
+                Token::OpenParen,
+                Token::CloseParen,
                 Token::Number(9999.0),
                 Token::Plus,
+                Token::OpenParen,
                 Token::Number(1.0),
                 Token::Plus,
                 Token::Number(22.0),
+                Token::CloseParen,
                 Token::Minus,
                 Token::Number(1.0),
                 Token::Star,
                 Token::Number(3.0),
                 Token::Div,
                 Token::Number(2.0),
+                Token::Identifier("compute".to_string()),
+                Token::OpenParen,
+                Token::CloseParen,
                 Token::Eof
             ]
         );
@@ -203,21 +212,44 @@ mod test {
         assert_eq!(
             tokens,
             vec![
-                Token::Number(30.0),
+                Token::Def,
+                Token::Identifier("than".to_string()),
+                Token::OpenParen,
+                Token::Identifier("x".to_string()),
+                Token::CloseParen,
+                Token::Identifier("if".to_string()),
+                Token::Identifier("x".to_string()),
                 Token::LessThan,
-                Token::Number(40.0),
-                Token::Semicolon,
                 Token::Number(20.0),
+                Token::Identifier("then".to_string()),
+                Token::Number(1.0),
+                Token::Identifier("if".to_string()),
+                Token::Identifier("x".to_string()),
                 Token::MoreThan,
+                Token::Number(30.0),
+                Token::Identifier("then".to_string()),
+                Token::Number(2.0),
+                Token::Identifier("else".to_string()),
+                Token::Number(3.0),
+                Token::Identifier("than".to_string()),
+                Token::OpenParen,
                 Token::Number(10.0),
-                Token::Semicolon,
+                Token::CloseParen,
+                Token::Identifier("than".to_string()),
+                Token::OpenParen,
+                Token::Number(40.0),
+                Token::CloseParen,
+                Token::Identifier("than".to_string()),
+                Token::OpenParen,
+                Token::Number(30.0),
+                Token::CloseParen,
                 Token::Eof
             ]
         );
     }
 
     #[test]
-    fn test_identifier() {
+    fn test_extern() {
         let f = File::open("tests/test_3.kal").unwrap();
         let mut lexer = Lexer::new(f);
         let tokens = lexer.tokenize().unwrap();
@@ -227,13 +259,20 @@ mod test {
             vec![
                 Token::Extern,
                 Token::Identifier("hello".to_string()),
+                Token::OpenParen,
+                Token::CloseParen,
                 Token::Semicolon,
                 Token::Def,
                 Token::Identifier("world".to_string()),
                 Token::OpenParen,
-                Token::Number(10.0),
                 Token::CloseParen,
-                Token::Semicolon,
+                Token::Number(10.0),
+                Token::Identifier("hello".to_string()),
+                Token::OpenParen,
+                Token::CloseParen,
+                Token::Identifier("world".to_string()),
+                Token::OpenParen,
+                Token::CloseParen,
                 Token::Eof
             ]
         );
