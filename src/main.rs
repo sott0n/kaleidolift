@@ -1,12 +1,15 @@
 mod ast;
+mod codegen;
 mod lexer;
 mod parser;
 
 use anyhow::Result;
-use lexer::Lexer;
-use parser::Parser;
 use std::env;
 use std::fs::File;
+
+use codegen::Generator;
+use lexer::Lexer;
+use parser::Parser;
 
 enum Commands {
     Help,
@@ -50,8 +53,8 @@ fn main() -> Result<()> {
             let tokens = lexer.tokenize()?;
             let mut parser = Parser::new(&tokens);
             let ast = parser.parse()?;
-
-            println!("{:#?}", ast);
+            let mut generator = Generator::new(&ast);
+            generator.gen()?;
         }
     }
     Ok(())
