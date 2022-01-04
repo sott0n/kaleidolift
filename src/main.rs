@@ -54,7 +54,9 @@ fn main() -> Result<()> {
             let mut parser = Parser::new(&tokens);
             let ast = parser.parse()?;
             let mut generator = Generator::new(&ast);
-            generator.gen()?;
+            let result = generator.gen()?;
+
+            println!("{}", result.unwrap());
         }
     }
     Ok(())

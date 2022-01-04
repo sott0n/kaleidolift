@@ -46,20 +46,21 @@ impl<'ast> Generator<'ast> {
         }
     }
 
-    pub fn gen(&mut self) -> Result<()> {
+    pub fn gen(&mut self) -> Result<Option<f64>> {
+        let mut result: Option<f64> = None;
         for node in self.ast.iter() {
-            match node {
+            result = match node {
                 Ast::Function(f) => match self.function(f) {
-                    Ok(func) => println!("{}", func()),
+                    Ok(func) => Some(func()),
                     Err(e) => return Err(e),
                 },
                 Ast::Prototype(p) => match self.prototype(p, Linkage::Import) {
-                    Ok(proto) => println!("{}", proto),
+                    Ok(_proto) => None,
                     Err(e) => return Err(e),
                 },
             };
         }
-        Ok(())
+        Ok(result)
     }
 
     pub fn function(&mut self, function: &Function) -> Result<fn() -> f64> {
@@ -260,5 +261,29 @@ impl VariableBuilder {
         self.index += 1;
         builder.def_var(variable, value);
         variable
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+    use std::fs::File;
+
+    fn setup(file_path: &str) -> Vec<Ast> {
+        let f = File::open(file_path).unwrap();
+        let mut lexer = Lexer::new(f);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(&tokens);
+        parser.parse().unwrap()
+    }
+
+    #[test]
+    fn test_1() {
+        let ast = setup("tests/test_1.kal");
+        let mut gen = Generator::new(&ast);
+        let result = gen.gen().unwrap().unwrap();
+        assert_eq!(result, 10020.5);
     }
 }
