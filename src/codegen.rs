@@ -1,14 +1,19 @@
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::mem;
+use std::str::FromStr;
 
 use cranelift::codegen::ir::InstBuilder;
+use cranelift::codegen::settings::Configurable;
 use cranelift::prelude::{
-    types, AbiParam, FloatCC, FunctionBuilder, FunctionBuilderContext, Value, Variable,
+    isa, settings, types, AbiParam, FloatCC, FunctionBuilder, FunctionBuilderContext, Value,
+    Variable,
 };
 use cranelift_codegen::binemit::{NullStackMapSink, NullTrapSink};
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{default_libcall_names, FuncId, Linkage, Module};
+use cranelift_preopt::optimize;
+use target_lexicon::triple;
 
 use crate::ast::{Ast, BinaryOp, Expr, Function, Prototype};
 
@@ -22,10 +27,20 @@ pub struct Generator<'ast> {
 
 impl<'ast> Generator<'ast> {
     pub fn new(ast: &'ast [Ast]) -> Self {
+        let mut flag_builder = settings::builder();
+        // You can set opt_level: any among none, speed or speed_and_size.
+        flag_builder
+            .set("opt_level", "speed_and_size")
+            .expect("set optlevel");
+
+        let isa_builder = isa::lookup(triple!("x86_64-unknown-unknown-elf")).expect("isa");
+        let isa = isa_builder.finish(settings::Flags::new(flag_builder));
+        let libcall_names = default_libcall_names();
+
         Self {
             builder_context: FunctionBuilderContext::new(),
             functions: HashMap::new(),
-            module: JITModule::new(JITBuilder::new(default_libcall_names())),
+            module: JITModule::new(JITBuilder::with_isa(isa, libcall_names)),
             variable_builder: VariableBuilder::new(),
             ast,
         }
@@ -35,11 +50,11 @@ impl<'ast> Generator<'ast> {
         for node in self.ast.iter() {
             match node {
                 Ast::Function(f) => match self.function(f) {
-                    Ok(_func) => (),
+                    Ok(func) => println!("{}", func()),
                     Err(e) => return Err(e),
                 },
                 Ast::Prototype(p) => match self.prototype(p, Linkage::Import) {
-                    Ok(_proto) => (),
+                    Ok(proto) => println!("{}", proto),
                     Err(e) => return Err(e),
                 },
             };
@@ -59,14 +74,19 @@ impl<'ast> Generator<'ast> {
         signature.returns.push(AbiParam::new(types::F64));
 
         let func_name = function.prototype.function_name.to_string();
+        // Create a function via `prototype()` and then insert it into self.functions.
         let func_id = self.prototype(&function.prototype, Linkage::Export)?;
 
         let mut builder = FunctionBuilder::new(&mut context.func, &mut self.builder_context);
         let entry_block = builder.create_block();
         builder.append_block_params_for_function_params(entry_block);
+        // After this instruction, specify where a next instruction.
         builder.switch_to_block(entry_block);
+        // Sealing means that we tell cranelift that all the deprodecessors of the block
+        // are known. This block is a entry block, then call `seal_block` func.
         builder.seal_block(entry_block);
 
+        // Create a variable hash map with (func-name, variable index).
         let mut values = HashMap::new();
         for (i, name) in params.iter().enumerate() {
             let val = builder.block_params(entry_block)[i];
@@ -74,6 +94,7 @@ impl<'ast> Generator<'ast> {
             values.insert(name.clone(), variable);
         }
 
+        // To do re-definition error at `prototype()`, check if function exists.
         if let Some(ref mut func) = self.functions.get_mut(&func_name) {
             func.defined = true;
         }
@@ -84,6 +105,7 @@ impl<'ast> Generator<'ast> {
             module: &mut self.module,
             values,
         };
+        // Expr function body and then return a opaque to an SSA value as return value.
         let return_value = match generator.expr(&function.body) {
             Ok(value) => value,
             Err(e) => {
@@ -95,9 +117,12 @@ impl<'ast> Generator<'ast> {
 
         generator.builder.ins().return_(&[return_value]);
         generator.builder.finalize();
+        optimize(&mut context, &*self.module.isa())?;
         println!("{}", context.func.display().to_string());
 
+        // TrapSink is to receive trap code and offsets.
         let mut trap_sink = NullTrapSink {};
+        // StackMapSink is to emit stack maps.
         let mut stack_map_sink = NullStackMapSink {};
 
         self.module
@@ -105,6 +130,11 @@ impl<'ast> Generator<'ast> {
         self.module.clear_context(&mut context);
         self.module.finalize_definitions();
 
+        if func_name.starts_with("__anon_") {
+            self.functions.remove(&func_name);
+        }
+
+        // Finally, we get the pointer to the generated code and cast it to a Rust function.
         unsafe { Ok(mem::transmute(self.module.get_finalized_function(func_id))) }
     }
 
