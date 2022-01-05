@@ -3,7 +3,7 @@ mod codegen;
 mod lexer;
 mod parser;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::env;
 use std::fs::File;
 
@@ -11,22 +11,56 @@ use codegen::Generator;
 use lexer::Lexer;
 use parser::Parser;
 
-enum Commands {
-    Help,
-    File(String),
+#[derive(PartialEq, Eq)]
+struct Commands {
+    file: String,
+    help: bool,
+    token: bool,
+    ast: bool,
 }
 
-fn arg_parse() -> Commands {
+fn arg_parse() -> Result<Commands> {
+    let mut file = String::from("");
+    let mut help = false;
+    let mut token = false;
+    let mut ast = false;
+
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
-        let cmd: Commands = match args[1].as_str() {
-            "--help" | "-h" => Commands::Help,
-            _ => Commands::File(args[1].to_string()),
-        };
-        cmd
+        for arg in args[1..].iter() {
+            match arg.as_str() {
+                "--help" | "-h" => {
+                    help = true;
+                    break;
+                }
+                "--token" | "-t" => {
+                    token = true;
+                }
+                "--ast" | "-a" => {
+                    ast = true;
+                }
+                _ => {
+                    if arg.ends_with(".kal") {
+                        file = arg.to_string();
+                    } else {
+                        return Err(anyhow!(format!(
+                            "File '{}' does not end with '.kal'. See --help.",
+                            arg
+                        )));
+                    }
+                }
+            };
+        }
     } else {
-        Commands::Help
+        help = true;
     }
+
+    Ok(Commands {
+        file,
+        help,
+        token,
+        ast,
+    })
 }
 
 fn help() {
@@ -35,29 +69,44 @@ fn help() {
 kaleidolift: A toy kaleidoscope language with cranelift backend.
 
 USAGE:
-    kaleidolift [COMMANDS]
+    kaleidolift [COMMANDS] [FILE]
+
+FILE: Given end with 'kal' file, compile using cranelift.
 
 COMMANDS:
-    --help | -h     : Show this help.
-    [FILE NAME]     : Given file, compile using cranelift.
+    --help   | -h     : Show this help.
+    --token  | -t     : Show only tokens from lexer.
+    --ast    | -a     : Show only AST from parser.
 "
     );
 }
 
 fn main() -> Result<()> {
-    match arg_parse() {
-        Commands::Help => help(),
-        Commands::File(f) => {
-            let f = File::open(f)?;
-            let mut lexer = Lexer::new(f);
-            let tokens = lexer.tokenize()?;
-            let mut parser = Parser::new(&tokens);
-            let ast = parser.parse()?;
-            let mut generator = Generator::new(&ast);
-            let result = generator.gen()?;
-
-            println!("{}", result.unwrap());
-        }
+    let cmds = arg_parse().unwrap();
+    if cmds.help {
+        help();
+        return Ok(());
     }
+
+    let f = File::open(cmds.file)?;
+    let mut lexer = Lexer::new(f);
+    let tokens = lexer.tokenize()?;
+    if cmds.token {
+        println!("{:#?}", tokens);
+        return Ok(());
+    }
+
+    let mut parser = Parser::new(&tokens);
+    let ast = parser.parse()?;
+    if cmds.ast {
+        println!("{:#?}", ast);
+        return Ok(());
+    }
+
+    let mut generator = Generator::new(&ast);
+    let result = generator.gen()?;
+
+    println!("{}", result.unwrap());
+
     Ok(())
 }
