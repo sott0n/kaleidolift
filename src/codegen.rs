@@ -15,7 +15,7 @@ use cranelift_module::{default_libcall_names, FuncId, Linkage, Module};
 use cranelift_preopt::optimize;
 use target_lexicon::triple;
 
-use crate::ast::{Ast, BinaryOp, Expr, Function, Prototype};
+use crate::ast::{Ast, BinaryOp, Expr, Function, Prototype, StmtExpr};
 
 pub struct Generator<'ast> {
     builder_context: FunctionBuilderContext,
@@ -107,7 +107,7 @@ impl<'ast> Generator<'ast> {
             values,
         };
         // Expr function body and then return a opaque to an SSA value as return value.
-        let return_value = match generator.expr(&function.body) {
+        let return_value = match generator.expr_body(&function.body) {
             Ok(value) => value,
             Err(e) => {
                 generator.builder.finalize();
@@ -197,6 +197,12 @@ pub struct FunctionGenerator<'a> {
 }
 
 impl<'a> FunctionGenerator<'a> {
+    fn expr_body(&mut self, stmt_expr: &StmtExpr) -> Result<Value> {
+        match stmt_expr {
+            StmtExpr::Expr(expr) => self.expr(expr),
+            _ => todo!("statement"),
+        }
+    }
     fn expr(&mut self, expr: &Expr) -> Result<Value> {
         let value = match expr {
             Expr::Number(num) => self.builder.ins().f64const(*num),

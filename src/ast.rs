@@ -17,9 +17,27 @@ pub enum Expr {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum Stmt {
+    Cond(Cond),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum StmtExpr {
+    Expr(Expr),
+    Stmt(Stmt),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Cond {
+    pub cond: Box<Expr>,
+    pub then: Box<Expr>,
+    pub else_then: Option<Box<Expr>>,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Function {
     pub prototype: Prototype,
-    pub body: Expr,
+    pub body: StmtExpr,
 }
 
 #[derive(Debug, PartialEq)]

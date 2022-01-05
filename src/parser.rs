@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::iter::Peekable;
 use std::slice::Iter;
 
-use crate::ast::{Ast, BinaryOp, Expr, Function, Prototype};
+use crate::ast::{Ast, BinaryOp, Cond, Expr, Function, Prototype, Stmt, StmtExpr};
 use crate::lexer::Token;
 
 pub struct Parser<'token> {
@@ -46,8 +46,8 @@ impl<'token> Parser<'token> {
                     ast.push(Ast::Prototype(prototype));
                 }
                 _ => {
-                    let expr = self.toplevel()?;
-                    ast.push(Ast::Function(expr));
+                    let func = self.toplevel()?;
+                    ast.push(Ast::Function(func));
                 }
             }
         }
@@ -83,7 +83,7 @@ impl<'token> Parser<'token> {
     fn definition(&mut self) -> Result<Function> {
         self.eat(Token::Def)?;
         let prototype = self.prototype()?;
-        let body = self.expr()?;
+        let body = self.stmt_expr()?;
         Ok(Function { prototype, body })
     }
 
@@ -229,15 +229,44 @@ impl<'token> Parser<'token> {
         self.prototype()
     }
 
+    fn stmt_expr(&mut self) -> Result<StmtExpr> {
+        let peek_token = self.peek()?;
+        match peek_token {
+            Token::If => {
+                self.eat(Token::If)?;
+                let condition = self.expr()?;
+                self.eat(Token::Then)?;
+                let block = self.expr()?;
+                let else_expr: Option<Box<Expr>> = match self.peek()? {
+                    Token::Else => {
+                        self.eat(Token::Else)?;
+                        let else_block = self.expr()?;
+                        Some(Box::new(else_block))
+                    }
+                    _ => None,
+                };
+                Ok(StmtExpr::Stmt(Stmt::Cond(Cond {
+                    cond: Box::new(condition),
+                    then: Box::new(block),
+                    else_then: else_expr,
+                })))
+            }
+            _ => {
+                let expr = self.expr()?;
+                Ok(StmtExpr::Expr(expr))
+            }
+        }
+    }
+
     fn toplevel(&mut self) -> Result<Function> {
-        let body = self.expr()?;
+        let body = self.stmt_expr()?;
         self.index += 1;
         Ok(Function {
-            body,
             prototype: Prototype {
                 function_name: format!("__anon_{}", self.index),
                 parameters: vec![],
             },
+            body,
         })
     }
 }
@@ -245,7 +274,7 @@ impl<'token> Parser<'token> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ast::{Ast, BinaryOp, Expr};
+    use crate::ast::{Ast, BinaryOp, Expr, StmtExpr};
     use crate::lexer::Lexer;
     use std::fs::File;
 
@@ -289,10 +318,16 @@ mod test {
         assert!(matches!(&ast[0], Ast::Function(..)));
 
         let expect_params: Vec<String> = vec![];
-        assert_func!(&ast[0], "compute", expect_params, Expr::Binary(..));
+        assert_func!(
+            &ast[0],
+            "compute",
+            expect_params,
+            StmtExpr::Expr(Expr::Binary(..))
+        );
 
         let func = extract_var!(&ast[0], Ast::Function, x);
-        let binary = extract_var!(&func.body, Expr::Binary, x, y, z);
+        let expr = extract_var!(&func.body, StmtExpr::Expr, x);
+        let binary = extract_var!(expr, Expr::Binary, x, y, z);
         assert_expr!(&binary, BinaryOp::Plus, Expr::Number(..), Expr::Binary(..));
 
         let right_1 = extract_var!(&**binary.2, Expr::Binary, x, y, z);
@@ -326,7 +361,12 @@ mod test {
 
         assert!(matches!(&ast[1], Ast::Function(..)));
         let expect_params: Vec<String> = Vec::new();
-        assert_func!(&ast[1], "__anon_1", expect_params, Expr::Call(..));
+        assert_func!(
+            &ast[1],
+            "__anon_1",
+            expect_params,
+            StmtExpr::Expr(Expr::Call(..))
+        );
     }
 
     //#[test]
