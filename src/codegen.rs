@@ -197,12 +197,16 @@ pub struct FunctionGenerator<'a> {
 }
 
 impl<'a> FunctionGenerator<'a> {
-    fn expr_body(&mut self, stmt_expr: &StmtExpr) -> Result<Value> {
-        match stmt_expr {
-            StmtExpr::Expr(expr) => self.expr(expr),
-            _ => todo!("statement"),
+    fn expr_body(&mut self, stmt_exprs: &[StmtExpr]) -> Result<Value> {
+        for stmt_expr in stmt_exprs {
+            match stmt_expr {
+                StmtExpr::Expr(expr) => return self.expr(expr),
+                _ => todo!("statement"),
+            };
         }
+        Err(anyhow!("Failed expression body"))
     }
+
     fn expr(&mut self, expr: &Expr) -> Result<Value> {
         let value = match expr {
             Expr::Number(num) => self.builder.ins().f64const(*num),

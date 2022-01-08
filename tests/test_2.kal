@@ -1,11 +1,12 @@
-def than(x)
+def than(x) {
   if x < 20 then
     1
   if x > 30 then
     2
   else
     3
+}
 
-than(10)
-than(40)
-than(30)
+than(10);
+than(40);
+than(30);

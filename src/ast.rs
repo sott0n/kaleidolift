@@ -18,7 +18,8 @@ pub enum Expr {
 
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
-    Cond(Cond),
+    // "if" "(" condition ")" "then" expr ("else" expr)?
+    If(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -28,16 +29,9 @@ pub enum StmtExpr {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Cond {
-    pub cond: Box<Expr>,
-    pub then: Box<Expr>,
-    pub else_then: Option<Box<Expr>>,
-}
-
-#[derive(Debug, PartialEq)]
 pub struct Function {
     pub prototype: Prototype,
-    pub body: StmtExpr,
+    pub body: Vec<StmtExpr>,
 }
 
 #[derive(Debug, PartialEq)]

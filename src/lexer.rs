@@ -28,6 +28,8 @@ pub enum Token {
     Comma,
     OpenParen,
     CloseParen,
+    OpenBlock,
+    CloseBlock,
 
     Eof,
 }
@@ -79,6 +81,8 @@ impl<R: Read> Lexer<R> {
                         b',' => Token::Comma,
                         b'(' => Token::OpenParen,
                         b')' => Token::CloseParen,
+                        b'{' => Token::OpenBlock,
+                        b'}' => Token::CloseBlock,
                         _ => return Err(anyhow!(format!("Unknown charactor: {}", byte))),
                     };
                     Ok(token)
@@ -188,6 +192,7 @@ mod test {
                 Token::Identifier("compute".to_string()),
                 Token::OpenParen,
                 Token::CloseParen,
+                Token::OpenBlock,
                 Token::Number(9999.0),
                 Token::Plus,
                 Token::OpenParen,
@@ -201,6 +206,7 @@ mod test {
                 Token::Number(3.0),
                 Token::Div,
                 Token::Number(2.0),
+                Token::CloseBlock,
                 Token::Identifier("compute".to_string()),
                 Token::OpenParen,
                 Token::CloseParen,
@@ -223,6 +229,7 @@ mod test {
                 Token::OpenParen,
                 Token::Identifier("x".to_string()),
                 Token::CloseParen,
+                Token::OpenBlock,
                 Token::If,
                 Token::Identifier("x".to_string()),
                 Token::LessThan,
@@ -237,18 +244,22 @@ mod test {
                 Token::Number(2.0),
                 Token::Else,
                 Token::Number(3.0),
+                Token::CloseBlock,
                 Token::Identifier("than".to_string()),
                 Token::OpenParen,
                 Token::Number(10.0),
                 Token::CloseParen,
+                Token::Semicolon,
                 Token::Identifier("than".to_string()),
                 Token::OpenParen,
                 Token::Number(40.0),
                 Token::CloseParen,
+                Token::Semicolon,
                 Token::Identifier("than".to_string()),
                 Token::OpenParen,
                 Token::Number(30.0),
                 Token::CloseParen,
+                Token::Semicolon,
                 Token::Eof
             ]
         );
