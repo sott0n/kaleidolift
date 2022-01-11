@@ -259,6 +259,13 @@ impl<'token> Parser<'token> {
                     };
                     stmt_exprs.push(StmtExpr::If(Box::new(condition), then_body, else_body))
                 }
+                Token::While => {
+                    self.eat(Token::While)?;
+                    let condition = self.expr()?;
+                    self.eat(Token::OpenBlock)?;
+                    let loop_body = self.stmt_expr()?;
+                    stmt_exprs.push(StmtExpr::While(Box::new(condition), loop_body))
+                }
                 Token::Semicolon | Token::Eof => {
                     break;
                 }

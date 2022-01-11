@@ -241,6 +241,7 @@ impl<'a> FunctionGenerator<'a> {
             StmtExpr::If(cond, then_body, else_body) => {
                 self.translate_if(cond, then_body, else_body)?
             }
+            StmtExpr::While(cond, loop_body) => self.translate_while_loop(cond, loop_body)?,
         };
         Ok(value)
     }
@@ -316,6 +317,33 @@ impl<'a> FunctionGenerator<'a> {
         let phi = self.builder.block_params(merge_block)[0];
 
         Ok(phi)
+    }
+
+    fn translate_while_loop(&mut self, cond: &StmtExpr, loop_body: &[StmtExpr]) -> Result<Value> {
+        let header_block = self.builder.create_block();
+        let body_block = self.builder.create_block();
+        let exit_block = self.builder.create_block();
+
+        self.builder.ins().jump(header_block, &[]);
+        self.builder.switch_to_block(header_block);
+
+        let cond_value = self.translate_expr(cond)?;
+        self.builder.ins().brz(cond_value, exit_block, &[]);
+        self.builder.ins().jump(body_block, &[]);
+
+        self.builder.switch_to_block(body_block);
+        self.builder.seal_block(body_block);
+
+        for expr in loop_body {
+            self.translate_expr(expr)?;
+        }
+        self.builder.ins().jump(header_block, &[]);
+
+        self.builder.switch_to_block(exit_block);
+        self.builder.seal_block(header_block);
+        self.builder.seal_block(exit_block);
+
+        Ok(self.builder.ins().f64const(0.))
     }
 }
 

@@ -15,8 +15,10 @@ pub enum StmtExpr {
     Number(f64),
     Variable(String),
     Assign(String, Box<StmtExpr>),
-    // "if" "(" condition ")" "then" expr ("else" expr)?
+    // "if" condition "{" Vec<expr> "}" ("else" "{" Vec<expr> "}")?
     If(Box<StmtExpr>, Vec<StmtExpr>, Vec<StmtExpr>),
+    // "while" "condition" "{" Vec<expr> "}"
+    While(Box<StmtExpr>, Vec<StmtExpr>),
 }
 
 #[derive(Debug, PartialEq)]

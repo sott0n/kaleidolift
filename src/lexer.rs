@@ -23,6 +23,7 @@ pub enum Token {
     LessThan,
     MoreThan,
     Assign,
+    While,
 
     // Other
     Semicolon,
@@ -156,6 +157,7 @@ impl<R: Read> Lexer<R> {
             "if" => Token::If,
             "then" => Token::Then,
             "else" => Token::Else,
+            "while" => Token::While,
             _ => Token::Identifier(ident),
         };
         Ok(token)
