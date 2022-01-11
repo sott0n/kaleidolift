@@ -15,7 +15,7 @@ use cranelift_module::{default_libcall_names, FuncId, Linkage, Module};
 use cranelift_preopt::optimize;
 use target_lexicon::triple;
 
-use crate::ast::{Ast, BinaryOp, Expr, Function, Prototype, StmtExpr};
+use crate::ast::{Ast, BinaryOp, Function, Prototype, StmtExpr};
 
 pub struct Generator<'ast> {
     builder_context: FunctionBuilderContext,
@@ -88,11 +88,11 @@ impl<'ast> Generator<'ast> {
         builder.seal_block(entry_block);
 
         // Create a variable hash map with (func-name, variable index).
-        let mut values = HashMap::new();
+        let mut variables = HashMap::new();
         for (i, name) in params.iter().enumerate() {
             let val = builder.block_params(entry_block)[i];
             let variable = self.variable_builder.create_var(&mut builder, val);
-            values.insert(name.clone(), variable);
+            variables.insert(name.clone(), variable);
         }
 
         // To do re-definition error at `prototype()`, check if function exists.
@@ -104,10 +104,10 @@ impl<'ast> Generator<'ast> {
             builder,
             functions: &self.functions,
             module: &mut self.module,
-            values,
+            variables,
         };
         // Expr function body and then return a opaque to an SSA value as return value.
-        let return_value = match generator.expr_body(&function.body) {
+        let return_value = match generator.translate(&function.body) {
             Ok(value) => value,
             Err(e) => {
                 generator.builder.finalize();
@@ -118,6 +118,8 @@ impl<'ast> Generator<'ast> {
 
         generator.builder.ins().return_(&[return_value]);
         generator.builder.finalize();
+
+        // Generate optimized CLIF.
         optimize(&mut context, &*self.module.isa())?;
         println!("{}", context.func.display().to_string());
 
@@ -193,30 +195,32 @@ pub struct FunctionGenerator<'a> {
     builder: FunctionBuilder<'a>,
     functions: &'a HashMap<String, CompiledFunction>,
     module: &'a mut JITModule,
-    values: HashMap<String, Variable>,
+    variables: HashMap<String, Variable>,
 }
 
 impl<'a> FunctionGenerator<'a> {
-    fn expr_body(&mut self, stmt_exprs: &[StmtExpr]) -> Result<Value> {
-        for stmt_expr in stmt_exprs {
-            match stmt_expr {
-                StmtExpr::Expr(expr) => return self.expr(expr),
-                _ => todo!("statement"),
-            };
+    fn translate(&mut self, stmts: &[StmtExpr]) -> Result<Value> {
+        let mut return_value: Option<Value> = None;
+        for expr in stmts {
+            return_value = Some(self.translate_expr(&*expr)?);
         }
-        Err(anyhow!("Failed expression body"))
+        if return_value.is_none() {
+            return Err(anyhow!("Failed expr a body"));
+        }
+
+        Ok(return_value.unwrap())
     }
 
-    fn expr(&mut self, expr: &Expr) -> Result<Value> {
+    fn translate_expr(&mut self, expr: &StmtExpr) -> Result<Value> {
         let value = match expr {
-            Expr::Number(num) => self.builder.ins().f64const(*num),
-            Expr::Variable(name) => match self.values.get(&*name) {
+            StmtExpr::Number(num) => self.builder.ins().f64const(*num),
+            StmtExpr::Variable(name) => match self.variables.get(&*name) {
                 Some(&variable) => self.builder.use_var(variable),
                 None => return Err(anyhow!(format!("Undefined variable {}", name))),
             },
-            Expr::Binary(op, left, right) => {
-                let left = self.expr(&*left)?;
-                let right = self.expr(&*right)?;
+            StmtExpr::Binary(op, left, right) => {
+                let left = self.translate_expr(&*left)?;
+                let right = self.translate_expr(&*right)?;
                 match op {
                     BinaryOp::Plus => self.builder.ins().fadd(left, right),
                     BinaryOp::Minus => self.builder.ins().fsub(left, right),
@@ -224,35 +228,86 @@ impl<'a> FunctionGenerator<'a> {
                     BinaryOp::Divide => self.builder.ins().fdiv(left, right),
                     BinaryOp::LessThan => {
                         let boolean = self.builder.ins().fcmp(FloatCC::LessThan, left, right);
-                        let int = self.builder.ins().bint(types::I32, boolean);
-                        self.builder.ins().fcvt_from_sint(types::F64, int)
+                        self.builder.ins().bint(types::I32, boolean)
                     }
                     BinaryOp::MoreThan => {
-                        let boolean = self.builder.ins().fcmp(FloatCC::LessThan, right, left);
-                        let int = self.builder.ins().bint(types::I32, boolean);
-                        self.builder.ins().fcvt_from_sint(types::F64, int)
+                        let boolean = self.builder.ins().fcmp(FloatCC::GreaterThan, left, right);
+                        self.builder.ins().bint(types::I32, boolean)
                     }
                 }
             }
-            Expr::Call(name, args) => match self.functions.get(&*name) {
-                Some(func) => {
-                    if func.param_count != args.len() {
-                        return Err(anyhow!(format!(
-                            "Wrong function's argument count, expect: {}, got: {}",
-                            func.param_count,
-                            args.len()
-                        )));
-                    }
-                    let local_func = self.module.declare_func_in_func(func.id, self.builder.func);
-                    let arguments: Result<Vec<_>> = args.iter().map(|arg| self.expr(arg)).collect();
-                    let arguments = arguments?;
-                    let call = self.builder.ins().call(local_func, &arguments);
-                    self.builder.inst_results(call)[0]
-                }
-                None => return Err(anyhow!(format!("Undefined function: {}", name))),
-            },
+            StmtExpr::Call(name, args) => self.translate_call(name, args)?,
+            StmtExpr::If(cond, then_body, else_body) => {
+                self.translate_if(cond, then_body, else_body)?
+            }
         };
         Ok(value)
+    }
+
+    fn translate_call(&mut self, name: &str, args: &[StmtExpr]) -> Result<Value> {
+        match self.functions.get(&*name) {
+            Some(func) => {
+                if func.param_count != args.len() {
+                    return Err(anyhow!(format!(
+                        "Wrong function's argument count, expect: {}, got: {}",
+                        func.param_count,
+                        args.len()
+                    )));
+                }
+                let local_func = self.module.declare_func_in_func(func.id, self.builder.func);
+                let arguments: Result<Vec<_>> =
+                    args.iter().map(|arg| self.translate_expr(&*arg)).collect();
+                let arguments = arguments?;
+                let call = self.builder.ins().call(local_func, &arguments);
+                Ok(self.builder.inst_results(call)[0])
+            }
+            None => return Err(anyhow!(format!("Undefined function: {}", name))),
+        }
+    }
+
+    fn translate_if(
+        &mut self,
+        cond: &StmtExpr,
+        then_body: &[StmtExpr],
+        else_body: &[StmtExpr],
+    ) -> Result<Value> {
+        let cond_value = self.translate_expr(cond)?;
+
+        let then_block = self.builder.create_block();
+        let else_block = self.builder.create_block();
+        let merge_block = self.builder.create_block();
+
+        // Add a block parameters as PHI function in SSA.
+        self.builder.append_block_param(merge_block, types::F64);
+
+        self.builder.ins().brz(cond_value, else_block, &[]);
+        self.builder.ins().jump(then_block, &[]);
+        self.builder.switch_to_block(then_block);
+        self.builder.seal_block(then_block);
+
+        let mut then_return = self.builder.ins().f64const(0.);
+        for expr in then_body {
+            then_return = self.translate_expr(expr)?;
+        }
+        // Jump to the merge block, passing it the block return value.
+        self.builder.ins().jump(merge_block, &[then_return]);
+
+        self.builder.switch_to_block(else_block);
+        self.builder.seal_block(else_block);
+
+        let mut else_return = self.builder.ins().f64const(0.);
+        for expr in else_body {
+            else_return = self.translate_expr(expr)?;
+        }
+        // Jump to the merge block, passing it the block return value.
+        self.builder.ins().jump(merge_block, &[else_return]);
+
+        self.builder.switch_to_block(merge_block);
+        self.builder.seal_block(merge_block);
+
+        let phi = self.builder.block_params(merge_block)[0];
+
+        Ok(phi)
     }
 }
 

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::iter::Peekable;
 use std::slice::Iter;
 
-use crate::ast::{Ast, BinaryOp, Expr, Function, Prototype, Stmt, StmtExpr};
+use crate::ast::{Ast, BinaryOp, Function, Prototype, StmtExpr};
 use crate::lexer::Token;
 
 pub struct Parser<'token> {
@@ -125,7 +125,7 @@ impl<'token> Parser<'token> {
         }
     }
 
-    fn expr(&mut self) -> Result<Expr> {
+    fn expr(&mut self) -> Result<StmtExpr> {
         let left = self.primary()?;
         self.binary_right(0, left)
     }
@@ -143,7 +143,7 @@ impl<'token> Parser<'token> {
         Ok(Some(op))
     }
 
-    fn binary_right(&mut self, expr_precedence: i32, left: Expr) -> Result<Expr> {
+    fn binary_right(&mut self, expr_precedence: i32, left: StmtExpr) -> Result<StmtExpr> {
         match self.binary_op()? {
             Some(op) => {
                 let token_precedence = self.precedence(op)?;
@@ -163,7 +163,7 @@ impl<'token> Parser<'token> {
                         }
                         None => right,
                     };
-                    let left = Expr::Binary(op, Box::new(left), Box::new(right));
+                    let left = StmtExpr::Binary(op, Box::new(left), Box::new(right));
                     self.binary_right(expr_precedence, left)
                 }
             }
@@ -178,21 +178,21 @@ impl<'token> Parser<'token> {
         }
     }
 
-    fn ident_expr(&mut self) -> Result<Expr> {
+    fn ident_expr(&mut self) -> Result<StmtExpr> {
         let name = self.ident()?;
         let ast = match self.peek()? {
             Token::OpenParen => {
                 self.eat(Token::OpenParen)?;
                 let args = self.args()?;
                 self.eat(Token::CloseParen)?;
-                Expr::Call(name, args)
+                StmtExpr::Call(name, args)
             }
-            _ => Expr::Variable(name),
+            _ => StmtExpr::Variable(name),
         };
         Ok(ast)
     }
 
-    fn args(&mut self) -> Result<Vec<Expr>> {
+    fn args(&mut self) -> Result<Vec<StmtExpr>> {
         if *self.peek()? == Token::CloseParen {
             return Ok(vec![]);
         }
@@ -204,11 +204,11 @@ impl<'token> Parser<'token> {
         Ok(args)
     }
 
-    fn primary(&mut self) -> Result<Expr> {
+    fn primary(&mut self) -> Result<StmtExpr> {
         let peek_token = self.peek()?;
         match peek_token {
             Token::Number(_) => match self.next_token()? {
-                Token::Number(num) => Ok(Expr::Number(*num)),
+                Token::Number(num) => Ok(StmtExpr::Number(*num)),
                 _ => Err(anyhow!("Expected token is a number")),
             },
             Token::OpenParen => {
@@ -242,28 +242,24 @@ impl<'token> Parser<'token> {
                 Token::If => {
                     self.eat(Token::If)?;
                     let condition = self.expr()?;
-                    self.eat(Token::Then)?;
-                    let block = self.expr()?;
-                    let else_expr: Option<Box<Expr>> = match self.peek()? {
+                    self.eat(Token::OpenBlock)?;
+                    let then_body = self.stmt_expr()?;
+                    let else_body: Vec<StmtExpr> = match self.peek()? {
                         Token::Else => {
                             self.eat(Token::Else)?;
-                            let else_block = self.expr()?;
-                            Some(Box::new(else_block))
+                            self.eat(Token::OpenBlock)?;
+                            self.stmt_expr()?
                         }
-                        _ => None,
+                        _ => vec![],
                     };
-                    stmt_exprs.push(StmtExpr::Stmt(Stmt::If(
-                        Box::new(condition),
-                        Box::new(block),
-                        else_expr,
-                    )))
+                    stmt_exprs.push(StmtExpr::If(Box::new(condition), then_body, else_body))
                 }
                 Token::Semicolon | Token::Eof => {
                     break;
                 }
                 _ => {
                     let expr = self.expr()?;
-                    stmt_exprs.push(StmtExpr::Expr(expr))
+                    stmt_exprs.push(expr)
                 }
             }
         }
@@ -287,7 +283,7 @@ impl<'token> Parser<'token> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ast::{Ast, BinaryOp, Expr, StmtExpr};
+    use crate::ast::{Ast, BinaryOp, StmtExpr};
     use crate::lexer::Lexer;
     use std::fs::File;
 
@@ -331,55 +327,49 @@ mod test {
         assert!(matches!(&ast[0], Ast::Function(..)));
 
         let expect_params: Vec<String> = vec![];
-        assert_func!(
-            &ast[0],
-            "compute",
-            expect_params,
-            StmtExpr::Expr(Expr::Binary(..))
-        );
+        assert_func!(&ast[0], "compute", expect_params, StmtExpr::Binary(..));
 
         let func = extract_var!(&ast[0], Ast::Function, x);
-        let expr = extract_var!(&func.body[0], StmtExpr::Expr, x);
-        let binary = extract_var!(expr, Expr::Binary, x, y, z);
-        assert_expr!(&binary, BinaryOp::Plus, Expr::Number(..), Expr::Binary(..));
+        let binary = extract_var!(&func.body[0], StmtExpr::Binary, x, y, z);
+        assert_expr!(
+            &binary,
+            BinaryOp::Plus,
+            StmtExpr::Number(..),
+            StmtExpr::Binary(..)
+        );
 
-        let right_1 = extract_var!(&**binary.2, Expr::Binary, x, y, z);
+        let right_1 = extract_var!(&**binary.2, StmtExpr::Binary, x, y, z);
         assert_expr!(
             &right_1,
             BinaryOp::Minus,
-            Expr::Binary(..),
-            Expr::Binary(..)
+            StmtExpr::Binary(..),
+            StmtExpr::Binary(..)
         );
-        let right_1_left = extract_var!(&**right_1.1, Expr::Binary, x, y, z);
+        let right_1_left = extract_var!(&**right_1.1, StmtExpr::Binary, x, y, z);
         assert_expr!(
             &right_1_left,
             BinaryOp::Plus,
-            Expr::Number(..),
-            Expr::Number(..)
+            StmtExpr::Number(..),
+            StmtExpr::Number(..)
         );
-        let right_1_right = extract_var!(&**right_1.2, Expr::Binary, x, y, z);
+        let right_1_right = extract_var!(&**right_1.2, StmtExpr::Binary, x, y, z);
         assert_expr!(
             &right_1_right,
             BinaryOp::Multiply,
-            Expr::Number(..),
-            Expr::Binary(..)
+            StmtExpr::Number(..),
+            StmtExpr::Binary(..)
         );
-        let right_2 = extract_var!(&**right_1_right.2, Expr::Binary, x, y, z);
+        let right_2 = extract_var!(&**right_1_right.2, StmtExpr::Binary, x, y, z);
         assert_expr!(
             &right_2,
             BinaryOp::Divide,
-            Expr::Number(..),
-            Expr::Number(..)
+            StmtExpr::Number(..),
+            StmtExpr::Number(..)
         );
 
         assert!(matches!(&ast[1], Ast::Function(..)));
         let expect_params: Vec<String> = Vec::new();
-        assert_func!(
-            &ast[1],
-            "__anon_1",
-            expect_params,
-            StmtExpr::Expr(Expr::Call(..))
-        );
+        assert_func!(&ast[1], "__anon_1", expect_params, StmtExpr::Call(..));
     }
 
     //#[test]

@@ -1,10 +1,12 @@
 def than(x) {
-  if x < 20 then
+  if x < 20 {
     1
-  if x > 30 then
+  }
+  if x > 30 {
     2
-  else
+  } else {
     3
+  }
 }
 
 than(10);

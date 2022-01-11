@@ -1,31 +1,21 @@
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum BinaryOp {
-    LessThan,
-    MoreThan,
-    Plus,
-    Minus,
-    Multiply,
-    Divide,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Expr {
-    Binary(BinaryOp, Box<Expr>, Box<Expr>),
-    Call(String, Vec<Expr>),
-    Number(f64),
-    Variable(String),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Stmt {
-    // "if" "(" condition ")" "then" expr ("else" expr)?
-    If(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
+    LessThan, // <
+    MoreThan, // >
+    Plus,     // +
+    Minus,    // -
+    Multiply, // *
+    Divide,   // /
 }
 
 #[derive(Debug, PartialEq)]
 pub enum StmtExpr {
-    Expr(Expr),
-    Stmt(Stmt),
+    Binary(BinaryOp, Box<StmtExpr>, Box<StmtExpr>),
+    Call(String, Vec<StmtExpr>),
+    Number(f64),
+    Variable(String),
+    // "if" "(" condition ")" "then" expr ("else" expr)?
+    If(Box<StmtExpr>, Vec<StmtExpr>, Vec<StmtExpr>),
 }
 
 #[derive(Debug, PartialEq)]
