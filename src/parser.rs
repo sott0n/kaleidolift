@@ -291,12 +291,18 @@ mod test {
         ($value:expr, $variant:path, $( $val:ident ),+) => {
             match $value {
                 $variant($( $val ),+) => ($( $val ),+),
-                _ => panic!("Missing specific variant"),
+                _ => panic!("Missing specific variant, {:?}", $value),
             }
         };
     }
 
     macro_rules! assert_func {
+        ($func:expr, $name:expr, $params:expr) => {
+            let f = extract_var!($func, Ast::Function, x);
+            assert_eq!(*&f.prototype.function_name, $name.to_string());
+            assert_eq!(*&f.prototype.parameters, $params);
+        };
+
         ($func:expr, $name:expr, $params:expr, $body:pat_param) => {
             let f = extract_var!($func, Ast::Function, x);
             assert_eq!(*&f.prototype.function_name, $name.to_string());
@@ -305,7 +311,7 @@ mod test {
         };
     }
 
-    macro_rules! assert_expr {
+    macro_rules! assert_binary {
         ($expr:expr, $op:path, $left:pat_param, $right:pat_param) => {
             assert_eq!(*$expr.0, $op);
             assert!(matches!(**$expr.1, $left));
@@ -331,7 +337,7 @@ mod test {
 
         let func = extract_var!(&ast[0], Ast::Function, x);
         let binary = extract_var!(&func.body[0], StmtExpr::Binary, x, y, z);
-        assert_expr!(
+        assert_binary!(
             &binary,
             BinaryOp::Plus,
             StmtExpr::Number(..),
@@ -339,28 +345,28 @@ mod test {
         );
 
         let right_1 = extract_var!(&**binary.2, StmtExpr::Binary, x, y, z);
-        assert_expr!(
+        assert_binary!(
             &right_1,
             BinaryOp::Minus,
             StmtExpr::Binary(..),
             StmtExpr::Binary(..)
         );
         let right_1_left = extract_var!(&**right_1.1, StmtExpr::Binary, x, y, z);
-        assert_expr!(
+        assert_binary!(
             &right_1_left,
             BinaryOp::Plus,
             StmtExpr::Number(..),
             StmtExpr::Number(..)
         );
         let right_1_right = extract_var!(&**right_1.2, StmtExpr::Binary, x, y, z);
-        assert_expr!(
+        assert_binary!(
             &right_1_right,
             BinaryOp::Multiply,
             StmtExpr::Number(..),
             StmtExpr::Binary(..)
         );
         let right_2 = extract_var!(&**right_1_right.2, StmtExpr::Binary, x, y, z);
-        assert_expr!(
+        assert_binary!(
             &right_2,
             BinaryOp::Divide,
             StmtExpr::Number(..),
@@ -372,38 +378,76 @@ mod test {
         assert_func!(&ast[1], "__anon_1", expect_params, StmtExpr::Call(..));
     }
 
-    //#[test]
-    //fn test_less_more_than() {
-    //    let ast = setup("tests/test_2.kal");
-    //    assert!(matches!(&ast[0], Ast::Function(..)));
+    #[test]
+    fn test_less_more_than() {
+        // # tests/test_2.kal
+        // def than(x) {
+        //   if x < 20 {  <- if1_cond
+        //     1          <- if1_then
+        //   }
+        //   if x > 30 {  <- if2_cond
+        //     2          <- if2_then
+        //   } else {
+        //     3          <- if2_else
+        //   }
+        // }
+        //
+        // than(10);      <- anon_call_1
+        // than(40);      <- anon_call_2
+        // than(30);      <- anon_call_3
+        let ast = setup("tests/test_2.kal");
+        assert!(matches!(&ast[0], Ast::Function(..)));
 
-    //    let expect_params: Vec<String> = vec!["x".to_string()];
-    //    assert_func!(&ast[0], "than", expect_params, Expr::Variable(..));
+        let expect_params: Vec<String> = vec!["x".to_string()];
+        assert_func!(&ast[0], "than", expect_params);
 
-    //    assert!(matches!(&ast[1], Ast::Function(..)));
-    //    let expect_params: Vec<String> = vec![];
-    //    assert_func!(&ast[1], "__anon_1", expect_params, Expr::Binary(..));
+        let func = extract_var!(&ast[0], Ast::Function, x);
 
-    //    let func = extract_var!(&ast[1], Ast::Function, x);
-    //    let binary = extract_var!(&func.body, Expr::Binary, x, y, z);
-    //    assert_expr!(
-    //        &binary,
-    //        BinaryOp::LessThan,
-    //        Expr::Variable(..),
-    //        Expr::Number(..)
-    //    );
+        // Test: if1_cond
+        let if1 = extract_var!(&func.body[0], StmtExpr::If, x, y, z);
+        let if1_cond = extract_var!(&**if1.0, StmtExpr::Binary, x, y, z);
+        assert_binary!(
+            &if1_cond,
+            BinaryOp::LessThan,
+            StmtExpr::Variable(..),
+            StmtExpr::Number(..)
+        );
+        let if1_cond_lhs = extract_var!(&**if1_cond.1, StmtExpr::Variable, x);
+        assert_eq!(*if1_cond_lhs, "x".to_string());
+        let if1_cond_rhs = extract_var!(&**if1_cond.2, StmtExpr::Number, x);
+        assert_eq!(*if1_cond_rhs, 20.);
 
-    //    assert!(matches!(&ast[4], Ast::Function(..)));
-    //    let expect_params: Vec<String> = vec![];
-    //    assert_func!(&ast[4], "__anon_4", expect_params, Expr::Binary(..));
+        // Test: if1_then
+        let if1_then = extract_var!(&(**if1.1)[0], StmtExpr::Number, x);
+        assert_eq!(*if1_then, 1.);
 
-    //    let func = extract_var!(&ast[4], Ast::Function, x);
-    //    let binary = extract_var!(&func.body, Expr::Binary, x, y, z);
-    //    assert_expr!(
-    //        &binary,
-    //        BinaryOp::MoreThan,
-    //        Expr::Variable(..),
-    //        Expr::Number(..)
-    //    );
-    //}
+        // Test: if2_cond
+        let if2 = extract_var!(&func.body[1], StmtExpr::If, x, y, z);
+        let if2_cond = extract_var!(&**if2.0, StmtExpr::Binary, x, y, z);
+        assert_binary!(
+            &if2_cond,
+            BinaryOp::MoreThan,
+            StmtExpr::Variable(..),
+            StmtExpr::Number(..)
+        );
+        let if2_cond_lhs = extract_var!(&**if2_cond.1, StmtExpr::Variable, x);
+        assert_eq!(*if2_cond_lhs, "x".to_string());
+        let if2_cond_rhs = extract_var!(&**if2_cond.2, StmtExpr::Number, x);
+        assert_eq!(*if2_cond_rhs, 30.);
+
+        // Test: if2_then
+        let if2_then = extract_var!(&(**if2.1)[0], StmtExpr::Number, x);
+        assert_eq!(*if2_then, 2.);
+        // Test: if2_else
+        let if2_else = extract_var!(&(**if2.2)[0], StmtExpr::Number, x);
+        assert_eq!(*if2_else, 3.);
+
+        let empty_params: Vec<String> = Vec::new();
+        // Test: anon_call_1
+        assert_func!(&ast[1], "__anon_1", empty_params, StmtExpr::Call(..));
+        // Test: anon_call_2
+        assert_func!(&ast[2], "__anon_2", empty_params, StmtExpr::Call(..));
+        // Test: anon_call_3
+        assert_func!(&ast[3], "__anon_3", empty_params, StmtExpr::Call(..));
+    }
 }
