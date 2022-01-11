@@ -218,6 +218,7 @@ impl<'a> FunctionGenerator<'a> {
                 Some(&variable) => self.builder.use_var(variable),
                 None => return Err(anyhow!(format!("Undefined variable {}", name))),
             },
+            StmtExpr::Assign(name, expr) => self.translate_assign(&*name, &*expr)?,
             StmtExpr::Binary(op, left, right) => {
                 let left = self.translate_expr(&*left)?;
                 let right = self.translate_expr(&*right)?;
@@ -242,6 +243,13 @@ impl<'a> FunctionGenerator<'a> {
             }
         };
         Ok(value)
+    }
+
+    fn translate_assign(&mut self, name: &str, expr: &StmtExpr) -> Result<Value> {
+        let assign_value = self.translate_expr(expr)?;
+        let variable = self.variables.get(name).unwrap();
+        self.builder.def_var(*variable, assign_value);
+        Ok(assign_value)
     }
 
     fn translate_call(&mut self, name: &str, args: &[StmtExpr]) -> Result<Value> {

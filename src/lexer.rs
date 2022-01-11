@@ -22,6 +22,7 @@ pub enum Token {
     Else,
     LessThan,
     MoreThan,
+    Assign,
 
     // Other
     Semicolon,
@@ -83,6 +84,7 @@ impl<R: Read> Lexer<R> {
                         b')' => Token::CloseParen,
                         b'{' => Token::OpenBlock,
                         b'}' => Token::CloseBlock,
+                        b'=' => Token::Assign,
                         _ => return Err(anyhow!(format!("Unknown charactor: {}", byte))),
                     };
                     Ok(token)
@@ -287,13 +289,17 @@ mod test {
                 Token::Identifier("world".to_string()),
                 Token::OpenParen,
                 Token::CloseParen,
+                Token::OpenBlock,
                 Token::Number(10.0),
+                Token::CloseBlock,
                 Token::Identifier("hello".to_string()),
                 Token::OpenParen,
                 Token::CloseParen,
+                Token::Semicolon,
                 Token::Identifier("world".to_string()),
                 Token::OpenParen,
                 Token::CloseParen,
+                Token::Semicolon,
                 Token::Eof
             ]
         );

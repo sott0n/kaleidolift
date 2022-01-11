@@ -1,7 +1,8 @@
 extern hello();
 
-def world()
+def world() {
   10
+}
 
-hello()
-world()
+hello();
+world();

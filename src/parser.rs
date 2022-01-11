@@ -187,6 +187,11 @@ impl<'token> Parser<'token> {
                 self.eat(Token::CloseParen)?;
                 StmtExpr::Call(name, args)
             }
+            Token::Assign => {
+                self.eat(Token::Assign)?;
+                let expr = self.expr()?;
+                StmtExpr::Assign(name, Box::new(expr))
+            }
             _ => StmtExpr::Variable(name),
         };
         Ok(ast)

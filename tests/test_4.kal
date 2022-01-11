@@ -1,2 +1,6 @@
-def foo(a b) a*a + 2*a*b + b*b;
-def bar(a) foo(a, 4.0) + bar(31337);
+def loop(a) {
+    for a < 10 {
+        a = a + 1;
+    }
+    a
+}

@@ -14,6 +14,7 @@ pub enum StmtExpr {
     Call(String, Vec<StmtExpr>),
     Number(f64),
     Variable(String),
+    Assign(String, Box<StmtExpr>),
     // "if" "(" condition ")" "then" expr ("else" expr)?
     If(Box<StmtExpr>, Vec<StmtExpr>, Vec<StmtExpr>),
 }
