@@ -9,29 +9,30 @@ pub enum Token {
     Identifier(String),
 
     // Commands
-    Def,
-    Extern,
+    Def,    // def
+    Extern, // extern
 
     // Operations
-    Plus,
-    Minus,
-    Star,
-    Div,
-    If,
-    Then,
-    Else,
-    LessThan,
-    MoreThan,
-    Assign,
-    While,
+    Plus,     // +
+    Minus,    // -
+    Star,     // *
+    Div,      // /
+    Eq,       // ==
+    Ne,       // !=
+    If,       // if
+    Else,     // else
+    LessThan, // <
+    MoreThan, // >
+    Assign,   // =
+    While,    // while
 
     // Other
-    Semicolon,
-    Comma,
-    OpenParen,
-    CloseParen,
-    OpenBlock,
-    CloseBlock,
+    Semicolon,  // ;
+    Comma,      // ,
+    OpenParen,  // (
+    CloseParen, // )
+    OpenBlock,  // {
+    CloseBlock, // }
 
     Eof,
 }
@@ -70,26 +71,7 @@ impl<R: Read> Lexer<R> {
                 b'a'..=b'z' | b'A'..=b'Z' => self.identifier(),
                 b'0'..=b'9' | b'.' => self.number(),
                 b'#' => self.comment(),
-                _ => {
-                    self.bytes.next();
-                    let token = match byte {
-                        b'+' => Token::Plus,
-                        b'-' => Token::Minus,
-                        b'*' => Token::Star,
-                        b'/' => Token::Div,
-                        b'<' => Token::LessThan,
-                        b'>' => Token::MoreThan,
-                        b';' => Token::Semicolon,
-                        b',' => Token::Comma,
-                        b'(' => Token::OpenParen,
-                        b')' => Token::CloseParen,
-                        b'{' => Token::OpenBlock,
-                        b'}' => Token::CloseBlock,
-                        b'=' => Token::Assign,
-                        _ => return Err(anyhow!(format!("Unknown charactor: {}", byte))),
-                    };
-                    Ok(token)
-                }
+                _ => self.symbol(),
             };
         }
 
@@ -98,6 +80,40 @@ impl<R: Read> Lexer<R> {
             Some(Err(e)) => Err(anyhow!(e)),
             None => Ok(Token::Eof),
         }
+    }
+
+    fn symbol(&mut self) -> Result<Token> {
+        let byte = self.bytes.next().unwrap()?;
+        let token = match byte {
+            b'+' => Token::Plus,
+            b'-' => Token::Minus,
+            b'*' => Token::Star,
+            b'/' => Token::Div,
+            b'<' => Token::LessThan,
+            b'>' => Token::MoreThan,
+            b';' => Token::Semicolon,
+            b',' => Token::Comma,
+            b'(' => Token::OpenParen,
+            b')' => Token::CloseParen,
+            b'{' => Token::OpenBlock,
+            b'}' => Token::CloseBlock,
+            b'!' => match self.peek_char()? {
+                Some('=') => {
+                    self.bytes.next();
+                    Token::Ne
+                }
+                _ => unimplemented!("Only `!` symblol"),
+            },
+            b'=' => match self.peek_char()? {
+                Some('=') => {
+                    self.bytes.next();
+                    Token::Eq
+                }
+                _ => Token::Assign,
+            },
+            _ => return Err(anyhow!(format!("Unknown charactor: {:?}", byte as char))),
+        };
+        Ok(token)
     }
 
     fn number(&mut self) -> Result<Token> {
@@ -155,7 +171,6 @@ impl<R: Read> Lexer<R> {
             "def" => Token::Def,
             "extern" => Token::Extern,
             "if" => Token::If,
-            "then" => Token::Then,
             "else" => Token::Else,
             "while" => Token::While,
             _ => Token::Identifier(ident),

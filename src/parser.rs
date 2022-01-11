@@ -15,12 +15,14 @@ pub struct Parser<'token> {
 impl<'token> Parser<'token> {
     pub fn new(tokens: &'token [Token]) -> Self {
         let mut bin_precedence = HashMap::new();
-        bin_precedence.insert(BinaryOp::LessThan, 10);
-        bin_precedence.insert(BinaryOp::MoreThan, 20);
-        bin_precedence.insert(BinaryOp::Plus, 30);
-        bin_precedence.insert(BinaryOp::Minus, 40);
-        bin_precedence.insert(BinaryOp::Multiply, 50);
-        bin_precedence.insert(BinaryOp::Divide, 60);
+        bin_precedence.insert(BinaryOp::Eq, 10);
+        bin_precedence.insert(BinaryOp::Ne, 20);
+        bin_precedence.insert(BinaryOp::LessThan, 30);
+        bin_precedence.insert(BinaryOp::MoreThan, 40);
+        bin_precedence.insert(BinaryOp::Plus, 50);
+        bin_precedence.insert(BinaryOp::Minus, 60);
+        bin_precedence.insert(BinaryOp::Multiply, 70);
+        bin_precedence.insert(BinaryOp::Divide, 80);
         Self {
             bin_precedence,
             index: 0,
@@ -132,6 +134,8 @@ impl<'token> Parser<'token> {
 
     fn binary_op(&mut self) -> Result<Option<BinaryOp>> {
         let op = match self.peek()? {
+            Token::Eq => BinaryOp::Eq,
+            Token::Ne => BinaryOp::Ne,
             Token::LessThan => BinaryOp::LessThan,
             Token::MoreThan => BinaryOp::MoreThan,
             Token::Minus => BinaryOp::Minus,

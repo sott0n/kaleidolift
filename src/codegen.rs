@@ -219,29 +219,45 @@ impl<'a> FunctionGenerator<'a> {
                 None => return Err(anyhow!(format!("Undefined variable {}", name))),
             },
             StmtExpr::Assign(name, expr) => self.translate_assign(&*name, &*expr)?,
-            StmtExpr::Binary(op, left, right) => {
-                let left = self.translate_expr(&*left)?;
-                let right = self.translate_expr(&*right)?;
-                match op {
-                    BinaryOp::Plus => self.builder.ins().fadd(left, right),
-                    BinaryOp::Minus => self.builder.ins().fsub(left, right),
-                    BinaryOp::Multiply => self.builder.ins().fmul(left, right),
-                    BinaryOp::Divide => self.builder.ins().fdiv(left, right),
-                    BinaryOp::LessThan => {
-                        let boolean = self.builder.ins().fcmp(FloatCC::LessThan, left, right);
-                        self.builder.ins().bint(types::I32, boolean)
-                    }
-                    BinaryOp::MoreThan => {
-                        let boolean = self.builder.ins().fcmp(FloatCC::GreaterThan, left, right);
-                        self.builder.ins().bint(types::I32, boolean)
-                    }
-                }
-            }
+            StmtExpr::Binary(op, left, right) => self.translate_binary(*op, left, right)?,
             StmtExpr::Call(name, args) => self.translate_call(name, args)?,
             StmtExpr::If(cond, then_body, else_body) => {
                 self.translate_if(cond, then_body, else_body)?
             }
             StmtExpr::While(cond, loop_body) => self.translate_while_loop(cond, loop_body)?,
+        };
+        Ok(value)
+    }
+
+    fn translate_binary(
+        &mut self,
+        op: BinaryOp,
+        left: &StmtExpr,
+        right: &StmtExpr,
+    ) -> Result<Value> {
+        let left = self.translate_expr(&*left)?;
+        let right = self.translate_expr(&*right)?;
+        let value = match op {
+            BinaryOp::Plus => self.builder.ins().fadd(left, right),
+            BinaryOp::Minus => self.builder.ins().fsub(left, right),
+            BinaryOp::Multiply => self.builder.ins().fmul(left, right),
+            BinaryOp::Divide => self.builder.ins().fdiv(left, right),
+            BinaryOp::Eq => {
+                let boolean = self.builder.ins().fcmp(FloatCC::Equal, left, right);
+                self.builder.ins().bint(types::I32, boolean)
+            }
+            BinaryOp::Ne => {
+                let boolean = self.builder.ins().fcmp(FloatCC::NotEqual, left, right);
+                self.builder.ins().bint(types::I32, boolean)
+            }
+            BinaryOp::LessThan => {
+                let boolean = self.builder.ins().fcmp(FloatCC::LessThan, left, right);
+                self.builder.ins().bint(types::I32, boolean)
+            }
+            BinaryOp::MoreThan => {
+                let boolean = self.builder.ins().fcmp(FloatCC::GreaterThan, left, right);
+                self.builder.ins().bint(types::I32, boolean)
+            }
         };
         Ok(value)
     }
