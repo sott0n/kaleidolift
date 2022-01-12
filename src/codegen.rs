@@ -23,10 +23,11 @@ pub struct Generator<'ast> {
     module: JITModule,
     variable_builder: VariableBuilder,
     ast: &'ast [Ast],
+    display_clif: bool,
 }
 
 impl<'ast> Generator<'ast> {
-    pub fn new(ast: &'ast [Ast]) -> Self {
+    pub fn new(ast: &'ast [Ast], display_clif: bool) -> Self {
         let mut flag_builder = settings::builder();
         // You can set opt_level: any among none, speed or speed_and_size.
         flag_builder
@@ -43,6 +44,7 @@ impl<'ast> Generator<'ast> {
             module: JITModule::new(JITBuilder::with_isa(isa, libcall_names)),
             variable_builder: VariableBuilder::new(),
             ast,
+            display_clif,
         }
     }
 
@@ -121,7 +123,10 @@ impl<'ast> Generator<'ast> {
 
         // Generate optimized CLIF.
         optimize(&mut context, &*self.module.isa())?;
-        println!("{}", context.func.display().to_string());
+
+        if self.display_clif {
+            println!("{}", context.func.display().to_string());
+        }
 
         // TrapSink is to receive trap code and offsets.
         let mut trap_sink = NullTrapSink {};
@@ -413,7 +418,7 @@ mod test {
     #[test]
     fn test_1() {
         let ast = setup("tests/test_1.kal");
-        let mut gen = Generator::new(&ast);
+        let mut gen = Generator::new(&ast, false);
         let result = gen.gen().unwrap().unwrap();
         assert_eq!(result, 10020.5);
     }

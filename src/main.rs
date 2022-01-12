@@ -17,6 +17,7 @@ struct Commands {
     help: bool,
     token: bool,
     ast: bool,
+    clif: bool,
 }
 
 fn arg_parse() -> Result<Commands> {
@@ -24,6 +25,7 @@ fn arg_parse() -> Result<Commands> {
     let mut help = false;
     let mut token = false;
     let mut ast = false;
+    let mut clif = false;
 
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
@@ -38,6 +40,9 @@ fn arg_parse() -> Result<Commands> {
                 }
                 "--ast" | "-a" => {
                     ast = true;
+                }
+                "--clif" | "-c" => {
+                    clif = true;
                 }
                 _ => {
                     if arg.ends_with(".kal") {
@@ -60,6 +65,7 @@ fn arg_parse() -> Result<Commands> {
         help,
         token,
         ast,
+        clif,
     })
 }
 
@@ -77,6 +83,7 @@ COMMANDS:
     --help   | -h     : Show this help.
     --token  | -t     : Show only tokens from lexer.
     --ast    | -a     : Show only AST from parser.
+    --clif   | -c     : Show only Cranelift IR from codegen.
 "
     );
 }
@@ -103,7 +110,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let mut generator = Generator::new(&ast);
+    let mut generator = Generator::new(&ast, cmds.clif);
     let result = generator.gen()?;
 
     println!("{}", result.unwrap());
