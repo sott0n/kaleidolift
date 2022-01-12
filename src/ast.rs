@@ -1,13 +1,15 @@
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum BinaryOp {
-    Eq,       // ==
-    Ne,       // !=
-    LessThan, // <
-    MoreThan, // >
-    Plus,     // +
-    Minus,    // -
-    Multiply, // *
-    Divide,   // /
+    Eq,    // ==
+    Ne,    // !=
+    Lt,    // <
+    Le,    // <=
+    Gt,    // >
+    Ge,    // >=
+    Plus,  // +
+    Minus, // -
+    Mul,   // *
+    Div,   // /
 }
 
 #[derive(Debug, PartialEq)]

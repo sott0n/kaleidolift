@@ -13,18 +13,20 @@ pub enum Token {
     Extern, // extern
 
     // Operations
-    Plus,     // +
-    Minus,    // -
-    Star,     // *
-    Div,      // /
-    Eq,       // ==
-    Ne,       // !=
-    If,       // if
-    Else,     // else
-    LessThan, // <
-    MoreThan, // >
-    Assign,   // =
-    While,    // while
+    Plus,   // +
+    Minus,  // -
+    Star,   // *
+    Div,    // /
+    Eq,     // ==
+    Ne,     // !=
+    If,     // if
+    Else,   // else
+    Lt,     // <
+    Le,     // <=
+    Gt,     // >
+    Ge,     // >=
+    Assign, // =
+    While,  // while
 
     // Other
     Semicolon,  // ;
@@ -89,14 +91,26 @@ impl<R: Read> Lexer<R> {
             b'-' => Token::Minus,
             b'*' => Token::Star,
             b'/' => Token::Div,
-            b'<' => Token::LessThan,
-            b'>' => Token::MoreThan,
             b';' => Token::Semicolon,
             b',' => Token::Comma,
             b'(' => Token::OpenParen,
             b')' => Token::CloseParen,
             b'{' => Token::OpenBlock,
             b'}' => Token::CloseBlock,
+            b'<' => match self.peek_char()? {
+                Some('=') => {
+                    self.bytes.next();
+                    Token::Le
+                }
+                _ => Token::Lt,
+            },
+            b'>' => match self.peek_char()? {
+                Some('=') => {
+                    self.bytes.next();
+                    Token::Ge
+                }
+                _ => Token::Gt,
+            },
             b'!' => match self.peek_char()? {
                 Some('=') => {
                     self.bytes.next();
@@ -251,14 +265,14 @@ mod test {
                 Token::OpenBlock,
                 Token::If,
                 Token::Identifier("x".to_string()),
-                Token::LessThan,
+                Token::Lt,
                 Token::Number(20.0),
                 Token::OpenBlock,
                 Token::Number(1.0),
                 Token::CloseBlock,
                 Token::If,
                 Token::Identifier("x".to_string()),
-                Token::MoreThan,
+                Token::Gt,
                 Token::Number(30.0),
                 Token::OpenBlock,
                 Token::Number(2.0),

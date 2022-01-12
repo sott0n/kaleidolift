@@ -240,8 +240,8 @@ impl<'a> FunctionGenerator<'a> {
         let value = match op {
             BinaryOp::Plus => self.builder.ins().fadd(left, right),
             BinaryOp::Minus => self.builder.ins().fsub(left, right),
-            BinaryOp::Multiply => self.builder.ins().fmul(left, right),
-            BinaryOp::Divide => self.builder.ins().fdiv(left, right),
+            BinaryOp::Mul => self.builder.ins().fmul(left, right),
+            BinaryOp::Div => self.builder.ins().fdiv(left, right),
             BinaryOp::Eq => {
                 let boolean = self.builder.ins().fcmp(FloatCC::Equal, left, right);
                 self.builder.ins().bint(types::I32, boolean)
@@ -250,12 +250,26 @@ impl<'a> FunctionGenerator<'a> {
                 let boolean = self.builder.ins().fcmp(FloatCC::NotEqual, left, right);
                 self.builder.ins().bint(types::I32, boolean)
             }
-            BinaryOp::LessThan => {
+            BinaryOp::Lt => {
                 let boolean = self.builder.ins().fcmp(FloatCC::LessThan, left, right);
                 self.builder.ins().bint(types::I32, boolean)
             }
-            BinaryOp::MoreThan => {
+            BinaryOp::Le => {
+                let boolean = self
+                    .builder
+                    .ins()
+                    .fcmp(FloatCC::LessThanOrEqual, left, right);
+                self.builder.ins().bint(types::I32, boolean)
+            }
+            BinaryOp::Gt => {
                 let boolean = self.builder.ins().fcmp(FloatCC::GreaterThan, left, right);
+                self.builder.ins().bint(types::I32, boolean)
+            }
+            BinaryOp::Ge => {
+                let boolean = self
+                    .builder
+                    .ins()
+                    .fcmp(FloatCC::GreaterThanOrEqual, left, right);
                 self.builder.ins().bint(types::I32, boolean)
             }
         };

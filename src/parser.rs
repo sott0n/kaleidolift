@@ -16,13 +16,15 @@ impl<'token> Parser<'token> {
     pub fn new(tokens: &'token [Token]) -> Self {
         let mut bin_precedence = HashMap::new();
         bin_precedence.insert(BinaryOp::Eq, 10);
-        bin_precedence.insert(BinaryOp::Ne, 20);
-        bin_precedence.insert(BinaryOp::LessThan, 30);
-        bin_precedence.insert(BinaryOp::MoreThan, 40);
+        bin_precedence.insert(BinaryOp::Ne, 11);
+        bin_precedence.insert(BinaryOp::Lt, 20);
+        bin_precedence.insert(BinaryOp::Le, 21);
+        bin_precedence.insert(BinaryOp::Gt, 30);
+        bin_precedence.insert(BinaryOp::Ge, 31);
         bin_precedence.insert(BinaryOp::Plus, 50);
         bin_precedence.insert(BinaryOp::Minus, 60);
-        bin_precedence.insert(BinaryOp::Multiply, 70);
-        bin_precedence.insert(BinaryOp::Divide, 80);
+        bin_precedence.insert(BinaryOp::Mul, 70);
+        bin_precedence.insert(BinaryOp::Div, 80);
         Self {
             bin_precedence,
             index: 0,
@@ -136,12 +138,14 @@ impl<'token> Parser<'token> {
         let op = match self.peek()? {
             Token::Eq => BinaryOp::Eq,
             Token::Ne => BinaryOp::Ne,
-            Token::LessThan => BinaryOp::LessThan,
-            Token::MoreThan => BinaryOp::MoreThan,
+            Token::Lt => BinaryOp::Lt,
+            Token::Le => BinaryOp::Le,
+            Token::Gt => BinaryOp::Gt,
+            Token::Ge => BinaryOp::Ge,
             Token::Minus => BinaryOp::Minus,
             Token::Plus => BinaryOp::Plus,
-            Token::Star => BinaryOp::Multiply,
-            Token::Div => BinaryOp::Divide,
+            Token::Star => BinaryOp::Mul,
+            Token::Div => BinaryOp::Div,
             _ => return Ok(None),
         };
         Ok(Some(op))
@@ -151,7 +155,7 @@ impl<'token> Parser<'token> {
         match self.binary_op()? {
             Some(op) => {
                 let token_precedence = self.precedence(op)?;
-                if token_precedence < expr_precedence {
+                if token_precedence <= expr_precedence {
                     Ok(left)
                 } else {
                     // Eat binary operator.
@@ -377,14 +381,14 @@ mod test {
         let right_1_right = extract_var!(&**right_1.2, StmtExpr::Binary, x, y, z);
         assert_binary!(
             &right_1_right,
-            BinaryOp::Multiply,
+            BinaryOp::Mul,
             StmtExpr::Number(..),
             StmtExpr::Binary(..)
         );
         let right_2 = extract_var!(&**right_1_right.2, StmtExpr::Binary, x, y, z);
         assert_binary!(
             &right_2,
-            BinaryOp::Divide,
+            BinaryOp::Div,
             StmtExpr::Number(..),
             StmtExpr::Number(..)
         );
@@ -424,7 +428,7 @@ mod test {
         let if1_cond = extract_var!(&**if1.0, StmtExpr::Binary, x, y, z);
         assert_binary!(
             &if1_cond,
-            BinaryOp::LessThan,
+            BinaryOp::Lt,
             StmtExpr::Variable(..),
             StmtExpr::Number(..)
         );
@@ -442,7 +446,7 @@ mod test {
         let if2_cond = extract_var!(&**if2.0, StmtExpr::Binary, x, y, z);
         assert_binary!(
             &if2_cond,
-            BinaryOp::MoreThan,
+            BinaryOp::Gt,
             StmtExpr::Variable(..),
             StmtExpr::Number(..)
         );
