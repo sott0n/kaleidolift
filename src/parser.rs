@@ -21,8 +21,8 @@ impl<'token> Parser<'token> {
         bin_precedence.insert(BinaryOp::Le, 21);
         bin_precedence.insert(BinaryOp::Gt, 30);
         bin_precedence.insert(BinaryOp::Ge, 31);
-        bin_precedence.insert(BinaryOp::Plus, 50);
-        bin_precedence.insert(BinaryOp::Minus, 60);
+        bin_precedence.insert(BinaryOp::Add, 50);
+        bin_precedence.insert(BinaryOp::Sub, 60);
         bin_precedence.insert(BinaryOp::Mul, 70);
         bin_precedence.insert(BinaryOp::Div, 80);
         Self {
@@ -142,8 +142,8 @@ impl<'token> Parser<'token> {
             Token::Le => BinaryOp::Le,
             Token::Gt => BinaryOp::Gt,
             Token::Ge => BinaryOp::Ge,
-            Token::Minus => BinaryOp::Minus,
-            Token::Plus => BinaryOp::Plus,
+            Token::Sub => BinaryOp::Sub,
+            Token::Add => BinaryOp::Add,
             Token::Star => BinaryOp::Mul,
             Token::Div => BinaryOp::Div,
             _ => return Ok(None),
@@ -359,7 +359,7 @@ mod test {
         let binary = extract_var!(&func.body[0], StmtExpr::Binary, x, y, z);
         assert_binary!(
             &binary,
-            BinaryOp::Plus,
+            BinaryOp::Add,
             StmtExpr::Number(..),
             StmtExpr::Binary(..)
         );
@@ -367,14 +367,14 @@ mod test {
         let right_1 = extract_var!(&**binary.2, StmtExpr::Binary, x, y, z);
         assert_binary!(
             &right_1,
-            BinaryOp::Minus,
+            BinaryOp::Sub,
             StmtExpr::Binary(..),
             StmtExpr::Binary(..)
         );
         let right_1_left = extract_var!(&**right_1.1, StmtExpr::Binary, x, y, z);
         assert_binary!(
             &right_1_left,
-            BinaryOp::Plus,
+            BinaryOp::Add,
             StmtExpr::Number(..),
             StmtExpr::Number(..)
         );

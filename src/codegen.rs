@@ -238,8 +238,8 @@ impl<'a> FunctionGenerator<'a> {
         let left = self.translate_expr(&*left)?;
         let right = self.translate_expr(&*right)?;
         let value = match op {
-            BinaryOp::Plus => self.builder.ins().fadd(left, right),
-            BinaryOp::Minus => self.builder.ins().fsub(left, right),
+            BinaryOp::Add => self.builder.ins().fadd(left, right),
+            BinaryOp::Sub => self.builder.ins().fsub(left, right),
             BinaryOp::Mul => self.builder.ins().fmul(left, right),
             BinaryOp::Div => self.builder.ins().fdiv(left, right),
             BinaryOp::Eq => {

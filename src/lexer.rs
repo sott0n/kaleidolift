@@ -13,8 +13,8 @@ pub enum Token {
     Extern, // extern
 
     // Operations
-    Plus,   // +
-    Minus,  // -
+    Add,    // +
+    Sub,    // -
     Star,   // *
     Div,    // /
     Eq,     // ==
@@ -87,8 +87,8 @@ impl<R: Read> Lexer<R> {
     fn symbol(&mut self) -> Result<Token> {
         let byte = self.bytes.next().unwrap()?;
         let token = match byte {
-            b'+' => Token::Plus,
-            b'-' => Token::Minus,
+            b'+' => Token::Add,
+            b'-' => Token::Sub,
             b'*' => Token::Star,
             b'/' => Token::Div,
             b';' => Token::Semicolon,
@@ -227,13 +227,13 @@ mod test {
                 Token::CloseParen,
                 Token::OpenBlock,
                 Token::Number(9999.0),
-                Token::Plus,
+                Token::Add,
                 Token::OpenParen,
                 Token::Number(1.0),
-                Token::Plus,
+                Token::Add,
                 Token::Number(22.0),
                 Token::CloseParen,
-                Token::Minus,
+                Token::Sub,
                 Token::Number(1.0),
                 Token::Star,
                 Token::Number(3.0),
